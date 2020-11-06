@@ -20,6 +20,9 @@
 #include "video.h"
 #include "vid_voodoo.h"
 
+#include "MiniVHD/minivhd.h"
+#include "MiniVHD/minivhd_util.h"
+
 //#define MAX_CYLINDERS ((((1 << 28)-1) / 16) / 63)
 #define MAX_CYLINDERS 265264 /*Award 430VX won't POST with a larger drive*/
 extern int pause;
@@ -1558,7 +1561,7 @@ static void update_hdd_cdrom(void* hdlg)
 }
 
 static volatile int create_drive_pos;
-static int create_drive(void* data)
+static int create_drive_raw(void* data)
 {
         int c;
         uint8_t buf[512];
@@ -1575,6 +1578,62 @@ static int create_drive(void* data)
         return 1;
 }
 
+static void vhd_progress_callback(uint32_t current_sector, uint32_t total_sectors)
+{
+        create_drive_pos = (int)current_sector;
+}
+
+static int create_drive_vhd_fixed(void* data)
+{
+        MVHDGeom geometry = { .cyl = hd_new_cyl, .heads = hd_new_hpc, .spt = hd_new_spt };        
+        int vhd_error = 0;
+        MVHDMeta* vhd = mvhd_create_fixed(hd_new_name, geometry, &vhd_error, vhd_progress_callback);
+        if (vhd == NULL)
+        {
+                return 0;
+        }
+        else
+        {
+                mvhd_close(vhd);
+                return 1;        
+        }
+}
+
+static int create_drive_vhd_dynamic()
+{       
+        MVHDGeom geometry = { .cyl = hd_new_cyl, .heads = hd_new_hpc, .spt = hd_new_spt };        
+        int vhd_error = 0;
+        MVHDMeta* vhd = mvhd_create_sparse(hd_new_name, geometry, &vhd_error);
+        if (vhd == NULL)
+        {
+                return 0;
+        }
+        else
+        {
+                mvhd_close(vhd);
+                return 1;        
+        }
+}
+
+static int create_drive_vhd_diff(char* parent_filename)
+{        
+        int vhd_error = 0;
+        MVHDMeta* vhd = mvhd_create_diff(hd_new_name, parent_filename, &vhd_error);        
+        if (vhd == NULL)
+        {
+                return 0;
+        }
+        else
+        {
+                MVHDGeom vhd_geom = mvhd_get_geometry(vhd);
+                hd_new_cyl = vhd_geom.cyl;
+                hd_new_hpc = vhd_geom.heads;
+                hd_new_spt = vhd_geom.spt;
+                mvhd_close(vhd);
+                return 1;        
+        }
+}
+
 static int hdnew_dlgproc(void* hdlg, int message, INT_PARAM wParam, LONG_PARAM lParam)
 {
         char s[260];
@@ -1583,6 +1642,7 @@ static int hdnew_dlgproc(void* hdlg, int message, INT_PARAM wParam, LONG_PARAM l
         PcemHDC hd[7];
         FILE *f;
         int hd_type;
+        int hd_format;
         int size;
 
         switch (message)
@@ -1613,6 +1673,13 @@ static int hdnew_dlgproc(void* hdlg, int message, INT_PARAM wParam, LONG_PARAM l
                         sprintf(s, "Type %02i : cylinders=%i, heads=%i, size=%iMB", c, hd_types[c-1].cylinders, hd_types[c-1].heads, (hd_types[c-1].cylinders * hd_types[c-1].heads * 17 * 512) / (1024 * 1024));
                         wx_sendmessage(h, WX_CB_ADDSTRING, 0, (LONG_PARAM)s);
                 }
+                wx_sendmessage(h, WX_CB_SETCURSEL, 0, 0);
+
+                h = wx_getdlgitem(hdlg, WX_ID("IDC_HDFORMAT"));
+                wx_sendmessage(h, WX_CB_ADDSTRING, 0, (LONG_PARAM)"Raw (.img)");
+                wx_sendmessage(h, WX_CB_ADDSTRING, 0, (LONG_PARAM)"Fixed-size VHD (.vhd)");
+                wx_sendmessage(h, WX_CB_ADDSTRING, 0, (LONG_PARAM)"Dynamic-size VHD (.vhd)");
+                wx_sendmessage(h, WX_CB_ADDSTRING, 0, (LONG_PARAM)"Differencing VHD (.vhd)");
                 wx_sendmessage(h, WX_CB_SETCURSEL, 0, 0);
 
                 return TRUE;
@@ -1653,14 +1720,47 @@ static int hdnew_dlgproc(void* hdlg, int message, INT_PARAM wParam, LONG_PARAM l
                                 return TRUE;
                         }
 
-                        f = fopen64(hd_new_name, "wb");
-                        if (!f)
-                        {
-                                wx_messagebox(hdlg, "Can't open file for write", "PCem error", WX_MB_OK);
-                                return TRUE;
-                        }
-                        wx_progressdialog(hdlg, "PCem", "Creating drive, please wait...", create_drive, f, hd_new_cyl * hd_new_hpc * hd_new_spt, &create_drive_pos);
+                        h = wx_getdlgitem(hdlg, WX_ID("IDC_HDFORMAT"));
+                        hd_format = wx_sendmessage(h, WX_CB_GETCURSEL, 0, 0);
 
+                        if (hd_format == 0) /* Raw .img */
+                        {
+                                f = fopen64(hd_new_name, "wb");
+                                if (!f)
+                                {
+                                        wx_messagebox(hdlg, "Can't open file for write", "PCem error", WX_MB_OK);
+                                        return TRUE;
+                                }
+                                wx_progressdialog(hdlg, "PCem", "Creating drive, please wait...", create_drive_raw, f, hd_new_cyl * hd_new_hpc * hd_new_spt, &create_drive_pos);
+                        }
+                        else if (hd_format == 1) /* Fixed VHD */
+                        {
+                                if (!wx_progressdialog(hdlg, "PCem", "Creating drive, please wait...", create_drive_vhd_fixed, NULL, hd_new_cyl * hd_new_hpc * hd_new_spt, &create_drive_pos))
+                                {
+                                       wx_messagebox(hdlg, "Can't create VHD", "PCem error", WX_MB_OK);
+                                       return TRUE; 
+                                }
+                        }
+                        else if (hd_format == 2) /* Dynamic VHD */
+                        {
+                                if (!create_drive_vhd_dynamic())
+                                {
+                                       wx_messagebox(hdlg, "Can't create VHD", "PCem error", WX_MB_OK);
+                                       return TRUE;
+                                }
+                        }
+                        else if (hd_format == 3) /* Differencing VHD */
+                        {
+                                if (!getfilewithcaption(hdlg, "VHD file (*.vhd)|*.vhd|All files (*.*)|*.*", "", "Select the parent VHD"))
+                                {
+                                        if (!create_drive_vhd_diff(openfilestring))
+                                        {
+                                                wx_messagebox(hdlg, "Can't create VHD", "PCem error", WX_MB_OK);
+                                                return TRUE;
+                                        }
+                                }                                
+                        }
+                        
                         wx_messagebox(hdlg, "Drive created, remember to partition and format the new drive.", "PCem", WX_MB_OK);
 
                         wx_enddialog(hdlg, 1);
@@ -1669,7 +1769,13 @@ static int hdnew_dlgproc(void* hdlg, int message, INT_PARAM wParam, LONG_PARAM l
                         wx_enddialog(hdlg, 0);
                         return TRUE;
                 } else if (ID_IS("IDC_CFILE")) {
-                        if (!getsfile(hdlg, "Hard disc image (*.img)|*.img|All files (*.*)|*.*", "", NULL, "img"))
+                        h = wx_getdlgitem(hdlg, WX_ID("IDC_HDFORMAT"));
+                        hd_format = wx_sendmessage(h, WX_CB_GETCURSEL, 0, 0);
+                        if (!getsfile(hdlg, 
+                                hd_format == 0 ? "Raw Hard disc image (*.img)|*.img|All files (*.*)|*.*" : "VHD file (*.vhd)|*.vhd|All files (*.*)|*.*",
+                                "", 
+                                NULL, 
+                                hd_format == 0 ? "img" : "vhd"))
                         {
                                 h = wx_getdlgitem(hdlg, WX_ID("IDC_EDITC"));
                                 wx_sendmessage(h, WX_WM_SETTEXT, 0, (LONG_PARAM) openfilestring);
@@ -1962,7 +2068,7 @@ static int hd_new(void *hdlg, int drive)
 
 static int hd_file(void *hdlg, int drive)
 {
-        if (!getfile(hdlg, "Hard disc image (*.img)|*.img|All files (*.*)|*.*", ""))
+        if (!getfile(hdlg, "Hard disc image (*.img;*.vhd)|*.img;*.vhd|All files (*.*)|*.*", ""))
         {
                 off64_t sz;
                 FILE *f = fopen64(openfilestring, "rb");
@@ -1971,9 +2077,28 @@ static int hd_file(void *hdlg, int drive)
                         wx_messagebox(hdlg,"Can't open file for read","PCem error",WX_MB_OK);
                         return TRUE;
                 }
-                fseeko64(f, -1, SEEK_END);
-                sz = ftello64(f) + 1;
-                fclose(f);
+
+                if (mvhd_file_is_vhd(f))
+                {
+                        fclose(f);
+                        int vhdError = 0;
+                        MVHDMeta* vhd = mvhd_open(openfilestring, true, &vhdError);
+                        if (vhd == NULL)
+                        {
+                                wx_messagebox(hdlg,"Can't open VHD file","PCem error",WX_MB_OK);
+                                return TRUE;
+                        }
+                        MVHDGeom geom = mvhd_get_geometry(vhd);
+                        sz = mvhd_calc_size_bytes(&geom);
+                        mvhd_close(vhd);
+                }
+                else
+                {
+                        fseeko64(f, -1, SEEK_END);
+                        sz = ftello64(f) + 1;
+                        fclose(f);
+                }                
+                
                 check_hd_type(hdlg, sz);
 
                 if (wx_dialogbox(hdlg, "HdSizeDlg", hdsize_dlgproc) == 1)
