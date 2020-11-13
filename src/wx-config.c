@@ -1588,7 +1588,7 @@ static void vhd_progress_callback(uint32_t current_sector, uint32_t total_sector
  * of about 21 MB, and should only be necessary for VHDs larger than 31.5 GB, so should never be more
  * than a tenth of a percent change in size.
  */
-static void adjust_vhd_geometry(MVHDGeom* vhd_geometry)
+static void adjust_pcem_geometry_for_vhd(MVHDGeom* vhd_geometry)
 {
         if (hd_new_cyl <= 65535)
                 return;
@@ -1610,10 +1610,28 @@ static void adjust_vhd_geometry(MVHDGeom* vhd_geometry)
         vhd_geometry->spt = 255;
 }
 
+static void adjust_vhd_geometry_for_pcem()
+{
+        if (hd_new_spt <= 63)
+                return;
+
+        int desired_sectors = hd_new_cyl * hd_new_hpc * hd_new_spt;
+        if (desired_sectors > 267321600)
+                desired_sectors = 267321600;
+
+        int remainder = desired_sectors % 85680; /* 8560 is the LCM of 1008 (63*16) and 4080 (255*16) */
+        if (remainder > 0)
+                desired_sectors -= remainder;
+
+        hd_new_cyl = desired_sectors / (16 * 63);
+        hd_new_hpc = 16;
+        hd_new_spt = 63;
+}
+
 static int create_drive_vhd_fixed(void* data)
 {
         MVHDGeom geometry = { .cyl = hd_new_cyl, .heads = hd_new_hpc, .spt = hd_new_spt };
-        adjust_vhd_geometry(&geometry);        
+        adjust_pcem_geometry_for_vhd(&geometry);        
                 
         int vhd_error = 0;
         MVHDMeta* vhd = mvhd_create_fixed(hd_new_name, geometry, &vhd_error, vhd_progress_callback);
@@ -1631,7 +1649,7 @@ static int create_drive_vhd_fixed(void* data)
 static int create_drive_vhd_dynamic(int blocksize)
 {       
         MVHDGeom geometry = { .cyl = hd_new_cyl, .heads = hd_new_hpc, .spt = hd_new_spt };  
-        adjust_vhd_geometry(&geometry);      
+        adjust_pcem_geometry_for_vhd(&geometry);      
         int vhd_error = 0;
         MVHDCreationOptions options;
         options.block_size_in_sectors = blocksize;
@@ -2216,7 +2234,11 @@ static int hd_file(void *hdlg, int drive)
                                 return TRUE;
                         }
                         MVHDGeom geom = mvhd_get_geometry(vhd);
-                        sz = mvhd_calc_size_bytes(&geom);
+                        hd_new_cyl = geom.cyl;
+                        hd_new_hpc = geom.heads;
+                        hd_new_spt = geom.spt;
+                        hd_new_type = 0;
+                        adjust_vhd_geometry_for_pcem();                        
                         mvhd_close(vhd);
                 }
                 else
@@ -2224,9 +2246,8 @@ static int hd_file(void *hdlg, int drive)
                         fseeko64(f, -1, SEEK_END);
                         sz = ftello64(f) + 1;
                         fclose(f);
-                }                
-                
-                check_hd_type(hdlg, sz);
+                        check_hd_type(hdlg, sz);
+                }
 
                 if (wx_dialogbox(hdlg, "HdSizeDlg", hdsize_dlgproc) == 1)
                 {
