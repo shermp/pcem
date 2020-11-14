@@ -103,10 +103,13 @@ void hdd_load(hdd_file_t *hdd, int d, const char *fn)
 
 void hdd_close(hdd_file_t *hdd)
 {
-        if (hdd->img_type == HDD_IMG_VHD)
-                mvhd_close((MVHDMeta*)hdd->f);
-        else if (hdd->img_type == HDD_IMG_RAW)
-                fclose((FILE*)hdd->f);
+        if (hdd->f)
+        {
+                if (hdd->img_type == HDD_IMG_VHD)
+                        mvhd_close((MVHDMeta*)hdd->f);
+                else if (hdd->img_type == HDD_IMG_RAW)
+                        fclose((FILE*)hdd->f);
+        }
         hdd->img_type = HDD_IMG_RAW;
         hdd->f = NULL;
 }
