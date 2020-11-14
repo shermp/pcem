@@ -24,7 +24,8 @@ typedef enum MVHDError {
     MVHD_ERR_INVALID_SIZE,
     MVHD_ERR_INVALID_BLOCK_SIZE,
     MVHD_ERR_INVALID_PARAMS,    
-    MVHD_ERR_CONV_SIZE
+    MVHD_ERR_CONV_SIZE,
+    MVHD_ERR_TIMESTAMP
 } MVHDError;
 
 typedef enum MVHDType {
@@ -91,12 +92,31 @@ bool mvhd_file_is_vhd(FILE* f);
  * \param [in] readonly set this to true to open the VHD in a read only manner
  * \param [out] err will be set if the VHD fails to open. Value could be one of 
  * MVHD_ERR_MEM, MVHD_ERR_FILE, MVHD_ERR_NOT_VHD, MVHD_ERR_FOOTER_CHECKSUM, MVHD_ERR_SPARSE_CHECKSUM, 
- * MVHD_ERR_TYPE
+ * MVHD_ERR_TYPE, MVHD_ERR_TIMESTAMP
  * If MVHD_ERR_FILE is set, mvhd_errno will be set to the appropriate system errno value
  * 
- * \return MVHDMeta pointer. If NULL, check err.
+ * \return MVHDMeta pointer. If NULL, check err. err may also be set to MVHD_ERR_TIMESTAMP if
+ *         opening a differencing VHD.
  */
 MVHDMeta* mvhd_open(const char* path, bool readonly, int* err);
+
+/**
+ * \brief Update the parent modified timestamp in the VHD file
+ * 
+ * Differencing VHD's use a parent last modified timestamp to try and detect if the
+ * parent has been modified after the child has been created. However, this is rather
+ * fragile and can be broken by moving/copying the parent. Also, MS DiskPart does not
+ * set this timestamp in the child :(
+ * 
+ * Be careful when using this function that you don't update the timestamp after the
+ * parent actually has been modified.
+ * 
+ * \param [in] vhdm Differencing VHD to update.
+ * \param [out] err will be set if the timestamp could not be updated
+ * 
+ * \return non-zero on error, 0 on success
+ */
+int mvhd_diff_update_par_timestamp(MVHDMeta* vhdm, int* err);
 
 /**
  * \brief Create a fixed VHD image
