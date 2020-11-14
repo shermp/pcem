@@ -2227,11 +2227,36 @@ static int hd_file(void *hdlg, int drive)
                 {
                         fclose(f);
                         int vhdError = 0;
-                        MVHDMeta* vhd = mvhd_open(openfilestring, true, &vhdError);
+                        MVHDMeta* vhd = mvhd_open(openfilestring, false, &vhdError);
                         if (vhd == NULL)
                         {
-                                wx_messagebox(hdlg,"Can't open VHD file","PCem error",WX_MB_OK);
+                                wx_messagebox(hdlg,mvhd_strerr(vhdError),"PCem error",WX_MB_OK);
                                 return TRUE;
+                        }
+                        else if (vhdError == MVHD_ERR_TIMESTAMP)
+                        {
+                                const char ts_warning[] = 
+                                        "WARNING: VHD PARENT/CHILD TIMESTAMPS DO NOT MATCH!\n\n"
+                                        "This could indicate that the parent image was modified after this VHD was created.\n\n"
+                                        "This could also happen if the VHD files were moved/copied, or the differencing VHD was created with DiskPart.\n\n"
+                                        "Do you wish to fix this error after a file copy or DiskPart creation?";
+                                int wx_res = wx_messagebox(hdlg,ts_warning,"PCem error", WX_MB_NODEFAULT);
+                                if (wx_res == WX_MB_YES)
+                                {
+                                        int ts_res = mvhd_diff_update_par_timestamp(vhd, &vhdError);
+                                        if (ts_res != 0)
+                                        {
+                                                wx_messagebox(hdlg,"Can't fix VHD timestamps","PCem error",WX_MB_OK);
+                                                mvhd_close(vhd);
+                                                return TRUE;
+                                        }
+                                } 
+                                else
+                                {
+                                        mvhd_close(vhd);
+                                        return TRUE;
+                                }
+                                
                         }
                         MVHDGeom geom = mvhd_get_geometry(vhd);
                         hd_new_cyl = geom.cyl;
