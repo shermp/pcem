@@ -2,7 +2,7 @@
 #define MINIVHD_UTIL_H
 
 #include <stdint.h>
-#include "minivhd_stdio.h"
+#include <stdio.h>
 #include <time.h>
 #include "minivhd_internal.h"
 #include "minivhd.h"

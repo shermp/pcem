@@ -1,7 +1,10 @@
+#ifndef _FILE_OFFSET_BITS
+#define _FILE_OFFSET_BITS 64
+#endif
 #include <assert.h>
 #include <ctype.h>
 #include <stdarg.h>
-#include "minivhd_stdio.h"
+#include <stdio.h>
 #include <string.h>
 #include "cwalk.h"
 /**
