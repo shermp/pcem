@@ -153,6 +153,8 @@ FILE* mvhd_fopen(const char* path, const char* mode, int* err) {
             *err = MVHD_ERR_UTF_TRANSCODING_FAILED;
         }
     }
+#elif defined(__MINGW32__) && !defined(__MINGW64_VERSION_MAJOR)
+    f = fopen64(path, mode);
 #else
     f = fopen(path, mode);
     if (f == NULL) {
@@ -255,7 +257,9 @@ int64_t mvhd_ftello64(FILE* stream)
 {
 #ifdef _MSC_VER
     return _ftelli64(stream);
-#else
+#elif defined(__MINGW32__) && !defined(__MINGW64_VERSION_MAJOR) /* ftello not available in MinGW, but is in MinGW-w64 */
+    return ftello64(stream);
+#else /* This should work with linux (with _FILE_OFFSET_BITS), and hopefully OS X and BSD */
     return ftello(stream);
 #endif
 }
@@ -264,7 +268,9 @@ int mvhd_fseeko64(FILE* stream, int64_t offset, int origin)
 {
 #ifdef _MSC_VER
     return _fseeki64(stream, offset, origin);
-#else
+#elif defined(__MINGW32__) && !defined(__MINGW64_VERSION_MAJOR) /* fseeko not available in MinGW, but is in MinGW-w64 */
+    return fseeko64(stream, offset, origin);
+#else /* This should work with linux (with _FILE_OFFSET_BITS), and hopefully OS X and BSD */
     return fseeko(stream, offset, origin);
 #endif
 }
