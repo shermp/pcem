@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <stdarg.h>
-#include <stdio.h>
+#include "minivhd_stdio.h"
 #include <string.h>
 #include "cwalk.h"
 /**

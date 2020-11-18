@@ -4,7 +4,7 @@
  */
 
 #include <stdlib.h>
-#include <stdio.h>
+#include "minivhd_stdio.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>

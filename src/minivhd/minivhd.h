@@ -1,7 +1,7 @@
 #ifndef MINIVHD_H
 #define MINIVHD_H
 
-#include <stdio.h>
+#include "minivhd_stdio.h"
 #include <stdbool.h>
 #include <stdint.h>
 

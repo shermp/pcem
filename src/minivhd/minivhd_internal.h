@@ -2,7 +2,7 @@
 #define MINIVHD_INTERNAL_H
 #include <stdint.h>
 #include <stdbool.h>
-#include <stdio.h>
+#include "minivhd_stdio.h"
 
 #define MVHD_FOOTER_SIZE 512
 #define MVHD_SPARSE_SIZE 1024
