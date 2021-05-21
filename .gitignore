@@ -1,0 +1,11 @@
+*.o
+*.log
+Makefile
+configure~
+PCem
+PCem.exe
+wx.res
+wx-resources.cpp
+config.status
+autom4te.cache/
+build/
