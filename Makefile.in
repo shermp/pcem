@@ -11,6 +11,12 @@ CPU := @CPU@
 USE_ALSA := @USE_ALSA@
 USE_NETWORKING := @USE_NETWORKING@
 
+pcem_LIBS := @LIBS@
+# for some reason, wx-config includes '-fpermissive' in CFLAGS
+pcem_CFLAGS := $(subst -fpermissive,,@CFLAGS@)
+pcem_CXXFLAGS := @CXXFLAGS@
+pcem_DEFS := @DEFS@
+
 ifeq ($(BUILD_OS),win)
 	PCEM_BIN := $(addsuffix .exe,$(BIN))
 else
@@ -56,11 +62,6 @@ endif
 ifeq ($(BUILD_OS),other)
 	PCEM_SOURCES += $(OS_OTHER_SRC)
 endif
-
-pcem_LIBS := @LIBS@
-pcem_CFLAGS := $(subst -fpermissive,,@CFLAGS@)
-pcem_CXXFLAGS := @CXXFLAGS@
-pcem_DEFS := @DEFS@
 
 SRC := $(addprefix src/,$(PCEM_SOURCES))
 XRC_SRC := $(addprefix src/,$(WXXRC_SRC))
