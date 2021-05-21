@@ -2,33 +2,33 @@
 #
 
 AC_PREREQ([2.61])
+m4_include([m4/ax_compare_version.m4])
 AC_INIT(PCem, v17, Sarah Walker <pcem@pcem-emulator.co.uk>, pcem)
+: ${CFLAGS=""}
+: ${CXXFLAGS=""}
 
 AC_CANONICAL_HOST
 
-AM_INIT_AUTOMAKE
 AC_PROG_CC
 AC_PROG_CXX
-AM_PROG_CC_C_O
-
-
 
 AC_MSG_CHECKING([whether to build for release])
 AC_ARG_ENABLE(release_build,
           AC_HELP_STRING([--enable-release-build], [build for release]))
-if test "$enable_release_build" = "yes"; then
+if test "$enable_release_build" == "yes"; then
+   AC_DEFINE([RELEASE_BUILD])
    AC_MSG_RESULT([yes])
 else
    AC_MSG_RESULT([no])
 fi
-AM_CONDITIONAL(RELEASE_BUILD, [test "$enable_release_build" = "yes"])
 
 AC_MSG_CHECKING([whether to enable debugging])
 AC_ARG_ENABLE(debug,
           AC_HELP_STRING([--enable-debug], [build debug executable]))
-if test "$enable_debug" = "yes"; then
-   CFLAGS="-Wall -O0 -g -D_DEBUG -fcommon"
-   CXXFLAGS="-Wall -O0 -g -D_DEBUG -fcommon"
+if test "$enable_debug" == "yes"; then
+   CFLAGS="-Wall -O0 -g -fcommon"
+   CXXFLAGS="-Wall -O0 -g -fcommon"
+   AC_DEFINE([_DEBUG])
    AC_MSG_RESULT([yes])
 else
    CFLAGS="-O3 -fcommon"
@@ -38,8 +38,9 @@ fi
 
 AC_MSG_CHECKING([whether to enable networking])
 AC_ARG_ENABLE(networking,
-          AC_HELP_STRING([--enable-networking], [enable networking]))
-if test "$enable_networking" = "yes"; then
+          AC_HELP_STRING([--disable-networking], [disable networking support]))
+if test "$enable_networking" != "no"; then
+   AC_SUBST([USE_NETWORKING], [1])
    AC_MSG_RESULT([yes])
 else
    AC_MSG_RESULT([no])
@@ -47,8 +48,8 @@ fi
 
 AC_MSG_CHECKING([whether to use ALSA for MIDI output])
 AC_ARG_ENABLE(alsa,
-          AC_HELP_STRING([--enable-alsa], [use ALSA for MIDI]))
-if test "$enable_alsa" = "yes"; then
+          AC_HELP_STRING([--disable-alsa], [don't ALSA for MIDI on Linux]))
+if test "$enable_alsa" != "no"; then
    AC_MSG_RESULT([yes])
 else
    AC_MSG_RESULT([no])
@@ -57,30 +58,27 @@ fi
 AC_MSG_CHECKING([for cpu])
 case "${host_cpu}" in
     i?86)
-    CPU=i386
+    CFLAGS="$CFLAGS -march=i686 -msse2"
+    CXXFLAGS="$CXXFLAGS -march=i686 -msse2"
+    AC_SUBST([CPU], [i386])
     AC_MSG_RESULT(${host_cpu})
     ;;
     x86_64)
-    CPU=x86_64
+    AC_SUBST([CPU], [x86_64])
     AC_MSG_RESULT(${host_cpu})
     ;;
     armv7l)
-    CPU=arm
+    AC_SUBST([CPU], [arm])
     AC_MSG_RESULT(${host_cpu})
     ;;
     aarch64)
-    CPU=arm64
+    AC_SUBST([CPU], [arm64])
     AC_MSG_RESULT(${host_cpu})
     ;;
     *)
     AC_MSG_ERROR([Unsupported CPU. ${host_cpu}])
     ;;
 esac
-
-AM_CONDITIONAL(CPU_I386, test "$CPU" = "i386")
-AM_CONDITIONAL(CPU_X86_64, test "$CPU" = "x86_64")
-AM_CONDITIONAL(CPU_ARM, test "$CPU" = "arm")
-AM_CONDITIONAL(CPU_ARM64, test "$CPU" = "arm64")
 
 AC_MSG_CHECKING([for off64_t $CPU])
 AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>]],[[off64_t n=0;]])],[has_lfs="yes"],[has_lfs="no"])
@@ -89,105 +87,99 @@ case "$host" in
        has_lfs="no"
        ;;
 esac
+if test "$has_lfs" == "no"; then
+   AC_DEFINE([off64_t],[off_t])
+   AC_DEFINE([fopen64],[fopen])
+   AC_DEFINE([fseeko64],[fseek])
+   AC_DEFINE([ftello64],[ftell])
+fi
 AC_MSG_RESULT($has_lfs)
 
 #AC_MSG_CHECKING([for libz])
 #AX_CHECK_ZLIB
 
-AM_CONDITIONAL(USE_WX, test "$enable_wx" = "yes")
-AM_CONDITIONAL(USE_NETWORKING, test "$enable_networking" = "yes")
-AM_CONDITIONAL(USE_ALSA, test "$enable_alsa" = "yes")
-
-AM_CONDITIONAL(HAS_OFF64T, test "$has_lfs" = "yes")
-
-SDL_VERSION=2.0.1
-AM_PATH_SDL2($SDL_VERSION,
-   :,
-   AC_MSG_ERROR([*** SDL version $SDL_VERSION not found!])
-)
-
-AM_OPTIONS_WXCONFIG
-reqwx=3.0.0
-AM_PATH_WXCONFIG($reqwx, wxWin=1)
-if test "$wxWin" != 1; then
-   AC_MSG_ERROR([
-      wxWidgets must be installed on your system.
- 
-      Please check that wx-config is in path, the directory
-      where wxWidgets libraries are installed (returned by
-      'wx-config --libs' or 'wx-config --static --libs' command)
-      is in LD_LIBRARY_PATH or equivalent variable and
-      wxWidgets version is $reqwx or above.
-      ])
-fi
-
-if test "$enable_alsa" == "yes"; then
-    AC_CHECK_LIB(asound, snd_pcm_open,
-        [],
-        [echo "You need to install the ALSA library."
-     exit -1])
-fi
-
 AC_CHECK_LIB([pthread], [pthread_create])
 
-build_macosx="no"
-build_linux="no"
-build_win="no"
-build_other="no"
+build_os="other"
 
 case "$host" in
     *-*-darwin*)
        LIBS="$LIBS -framework OpenGL"
        LIBS="$LIBS -framework OpenAL"
-       build_macosx="yes"
+       AC_DEFINE([PCEM_RENDER_WITH_TIMER])
+       AC_DEFINE([PCEM_RENDER_TIMER_LOOP])
+       build_os="macosx"
        ;;
     *-*-cygwin* | *-*-mingw32*)
-       AC_CHECK_LIB([opengl32], [main], [], \
-           [echo "You need to install the OpenGL library."
-           exit -1])
-       AC_CHECK_LIB([openal], [alGetError], [], \
-          [echo "You need to install the OpenAL library."
-           exit -1])
-       build_win="yes"
+       LIBS="$LIBS -lwinmm"
+       test "$enable_networking" != "no" && LIBS="$LIBS -lwsock32 -liphlpapi"
+       build_os="win"
        AC_SUBST(SET_MAKE, 'MAKE=mingw32-make')
        ;;
     *-*-linux*)
-       AC_CHECK_LIB([GL], [glGetError], [], \
-           [echo "You need to install the OpenGL library."
-           exit -1])
-       AC_CHECK_LIB([openal], [alGetError], [], \
-           [echo "You need to install the OpenAL library."
-           exit -1])
-       build_linux="yes"
+       build_os="linux"
        ;;
     *-*-freebsd*)
        CFLAGS="$CFLAGS -I/usr/local/include"
        CXXFLAGS="$CXXFLAGS -I/usr/local/include"
        LDFLAGS="$LDFLAGS -L/usr/local/lib"
-       AC_CHECK_LIB([GL], [glGetError], [], \
-           [echo "You need to install the OpenGL library."
-           exit -1])
-       AC_CHECK_LIB([openal], [alGetError], [], \
-           [echo "You need to install the OpenAL library."
-           exit -1])
-       build_other="yes"
        ;;
     *)
-       AC_CHECK_LIB([GL], [glGetError], [], \
-           [echo "You need to install the OpenGL library."
-           exit -1])
-       AC_CHECK_LIB([openal], [alGetError], [], \
-           [echo "You need to install the OpenAL library."
-           exit -1])
-       build_other="yes"
        ;;
 esac
 
-LIBS="$LIBS $WX_LIBS $SDL_LIBS"
+AC_CHECK_PROG(sdl_cfg, [sdl2-config], [yes], [no])
+if test "$sdl_cfg" == "yes"; then 
+   sdl_ver=$(sdl2-config --version)
+   AX_COMPARE_VERSION($sdl_ver,[ge],[2.0.1],
+   [AC_MSG_NOTICE([Ok])],
+   [AC_MSG_ERROR([SLD2 version < 2.0.1])])
 
-AM_CONDITIONAL(OS_LINUX, [test "$build_linux" = "yes"])
-AM_CONDITIONAL(OS_WINDOWS, [test "$build_win" = "yes"])
-AM_CONDITIONAL(OS_OTHER, [test "$build_other" = "yes"])
-AM_CONDITIONAL(OS_MACOSX, [test "$build_macosx" = "yes"])
+   CFLAGS="$CFLAGS $(sdl2-config --cflags)"
+   LIBS="$LIBS $(sdl2-config --libs)"
+else
+   AC_MSG_ERROR([sdl2-config not found.])
+fi
 
-AC_OUTPUT([Makefile src/Makefile])
+AC_CHECK_PROG(wx_cfg, [wx-config], [yes], [no])
+if test "$wx_cfg" == "yes"; then
+   wx_inst=$(wx-config --version)
+   AX_COMPARE_VERSION($wx_inst,[ge],[3.0.0],
+   [AC_MSG_NOTICE([Ok])],
+   [AC_MSG_ERROR([WX version < 3.0.0])])
+
+   CFLAGS="$CFLAGS $(wx-config --cflags)"
+   CXXFLAGS="$CXXFLAGS $(wx-config --cxxflags)"
+   LIBS="$LIBS $(wx-config --libs)"
+
+   if test "$build_os" == "win"; then
+      windres=$(wx-config --rescomp)
+      AC_SUBST([WINDRES], [$windres])
+   fi
+else
+   AC_MSG_ERROR([wx-config not found.])
+fi
+
+# ALSA only makes sense on Linux
+if test "$build_os" == "linux" && test "$enable_alsa" != "no" ; then
+   AC_CHECK_LIB(asound, snd_pcm_open, [],
+            [echo "You need to install the ALSA library."
+             exit -1])
+   AC_SUBST([USE_ALSA], [1])
+fi
+if test "$build_os" == "win"; then
+   AC_CHECK_LIB([opengl32], [main], [],
+           [echo "You need to install the OpenGL library."
+            exit -1])
+else
+   AC_CHECK_LIB([GL], [glGetError], [],
+           [echo "You need to install the OpenGL library."
+            exit -1])
+fi
+AC_CHECK_LIB([openal], [alGetError], [],
+          [echo "You need to install the OpenAL library."
+           exit -1])
+
+AC_SUBST([BUILD_OS],[$build_os])
+
+AC_OUTPUT([Makefile])
