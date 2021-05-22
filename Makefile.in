@@ -77,6 +77,9 @@ ifeq ($(BUILD_OS),win)
 	OBJ += $(RC_RES)
 endif
 
+.PHONY: all
+all: $(PCEM_BIN)
+
 $(PCEM_BIN): $(OBJ)
 	$(CXX) $^ -o $@ $(pcem_LIBS)
 
