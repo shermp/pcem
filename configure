@@ -615,6 +615,7 @@ PACKAGE_STRING='PCem v17'
 PACKAGE_BUGREPORT='Sarah Walker <pcem@pcem-emulator.co.uk>'
 PACKAGE_URL=''
 
+ac_default_prefix=`pwd`/install
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
 BUILD_OS
@@ -623,7 +624,6 @@ WINDRES
 wx_cfg
 AWK
 sdl_cfg
-SET_MAKE
 CPU
 USE_NETWORKING
 ac_ct_CXX
@@ -4210,9 +4210,8 @@ case "$host" in
     *-*-cygwin* | *-*-mingw32*)
        LIBS="$LIBS -lwinmm"
        test "$enable_networking" != "no" && LIBS="$LIBS -lwsock32 -liphlpapi"
-       build_os="win"
-       SET_MAKE='MAKE=mingw32-make'
 
+       build_os="win"
        ;;
     *-*-linux*)
        build_os="linux"

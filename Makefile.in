@@ -5,6 +5,8 @@ CC := @CC@
 CXX := @CXX@
 WINDRES := @WINDRES@
 
+prefix := @prefix@
+
 BIN := @PACKAGE_NAME@
 BUILD_OS := @BUILD_OS@
 CPU := @CPU@
@@ -19,6 +21,8 @@ pcem_DEFS := @DEFS@
 
 ifeq ($(BUILD_OS),win)
 	PCEM_BIN := $(addsuffix .exe,$(BIN))
+	# During install on Windows, require ntldd
+	NTLDD := $(shell command -v ntldd 2> /dev/null)
 else
 	PCEM_BIN := $(BIN)
 endif
@@ -98,3 +102,20 @@ $(RC_RES): $(RC_SRC)
 .PHONY: clean
 clean:
 	rm -f $(PCEM_BIN) $(OBJ) $(XRC_RES)
+
+.PHONY: install
+install:
+ifeq ($(BUILD_OS),win)
+ifndef NTLDD
+$(error ntldd required when installing on Windows)
+endif
+	mkdir -p "$(prefix)"
+	cp $(PCEM_BIN) "$(prefix)"
+	# Find and copy all required dll files
+	for library in $$($(NTLDD) -R "$(PCEM_BIN)" | sed -e 's/^[[:blank:]]*//g' | cut -d ' ' -f 3 | grep -i 'mingw' | sed -e 's|\\|/|g'); do \
+		cp "$$library" "$(prefix)"; \
+	done
+	cp -R "$(srcdir)/roms" "$(prefix)" 
+	cp -R "$(srcdir)/nvr" "$(prefix)"
+	cp -R "$(srcdir)/configs" "$(prefix)"
+endif

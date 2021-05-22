@@ -122,8 +122,8 @@ case "$host" in
     *-*-cygwin* | *-*-mingw32*)
        LIBS="$LIBS -lwinmm"
        test "$enable_networking" != "no" && LIBS="$LIBS -lwsock32 -liphlpapi"
+       AC_PREFIX_DEFAULT([`pwd`/install])
        build_os="win"
-       AC_SUBST(SET_MAKE, 'MAKE=mingw32-make')
        ;;
     *-*-linux*)
        build_os="linux"
