@@ -36,6 +36,15 @@ else
    AC_MSG_RESULT([no])
 fi
 
+AC_MSG_CHECKING([whether to statically link wxWidgets])
+AC_ARG_ENABLE(wx_static,
+          AC_HELP_STRING([--enable-wx-static], [enable wxWidgets static linking]))
+if test "$enable_wx_static" == "yes"; then
+   AC_MSG_RESULT([yes])
+else
+   AC_MSG_RESULT([no])
+fi
+
 AC_MSG_CHECKING([whether to enable networking])
 AC_ARG_ENABLE(networking,
           AC_HELP_STRING([--disable-networking], [disable networking support]))
@@ -148,9 +157,12 @@ if test "$wx_cfg" == "yes"; then
    [AC_MSG_NOTICE([Ok])],
    [AC_MSG_ERROR([WX version < 3.0.0])])
 
-   CFLAGS="$CFLAGS $(wx-config --cflags)"
-   CXXFLAGS="$CXXFLAGS $(wx-config --cxxflags)"
-   LIBS="$LIBS $(wx-config --libs)"
+   wx_cfg=wx-config
+   test "$enable_wx_static" == "yes" && wx_cfg="wx-config --static"
+
+   CFLAGS="$CFLAGS $(${wx_cfg} --cflags)"
+   CXXFLAGS="$CXXFLAGS $(${wx_cfg} --cxxflags)"
+   LIBS="$LIBS $(${wx_cfg} --libs)"
 
    if test "$build_os" == "win"; then
       windres=$(wx-config --rescomp)

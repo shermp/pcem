@@ -688,6 +688,7 @@ ac_user_opts='
 enable_option_checking
 enable_release_build
 enable_debug
+enable_wx_static
 enable_networking
 enable_alsa
 '
@@ -1326,6 +1327,7 @@ Optional Features:
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-release-build  build for release
   --enable-debug          build debug executable
+  --enable-wx-static      enable wxWidgets static linking
   --disable-networking    disable networking support
   --disable-alsa          don't ALSA for MIDI on Linux
 
@@ -4022,6 +4024,22 @@ else
 printf "%s\n" "no" >&6; }
 fi
 
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether to statically link wxWidgets" >&5
+printf %s "checking whether to statically link wxWidgets... " >&6; }
+# Check whether --enable-wx_static was given.
+if test ${enable_wx_static+y}
+then :
+  enableval=$enable_wx_static;
+fi
+
+if test "$enable_wx_static" == "yes"; then
+   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
+else
+   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+fi
+
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether to enable networking" >&5
 printf %s "checking whether to enable networking... " >&6; }
 # Check whether --enable-networking was given.
@@ -4427,9 +4445,12 @@ printf "%s\n" "$as_me: Ok" >&6;}
   fi
 
 
-   CFLAGS="$CFLAGS $(wx-config --cflags)"
-   CXXFLAGS="$CXXFLAGS $(wx-config --cxxflags)"
-   LIBS="$LIBS $(wx-config --libs)"
+   wx_cfg=wx-config
+   test "$enable_wx_static" == "yes" && wx_cfg="wx-config --static"
+
+   CFLAGS="$CFLAGS $(${wx_cfg} --cflags)"
+   CXXFLAGS="$CXXFLAGS $(${wx_cfg} --cxxflags)"
+   LIBS="$LIBS $(${wx_cfg} --libs)"
 
    if test "$build_os" == "win"; then
       windres=$(wx-config --rescomp)
