@@ -77,6 +77,9 @@ ifeq ($(BUILD_OS),win)
 	OBJ += $(RC_RES)
 endif
 
+DEPS = $(addsuffix .d,$(OBJ))
+DEPS_FLAGS = -MMD -MP -MF $@.d
+
 .PHONY: all
 all: $(PCEM_BIN)
 
@@ -92,15 +95,15 @@ $(RC_RES): $(RC_SRC)
 
 %.o : %.c
 	mkdir -p $(dir $@)
-	$(CC) $(pcem_CFLAGS) $(pcem_DEFS) -c $< -o $@
+	$(CC) $(pcem_CFLAGS) $(pcem_DEFS) $(DEPS_FLAGS) -c $< -o $@
 
 %.o : %.cc
 	mkdir -p $(dir $@)
-	$(CXX) $(pcem_CXXFLAGS) $(pcem_DEFS) -c $< -o $@
+	$(CXX) $(pcem_CXXFLAGS) $(pcem_DEFS) $(DEPS_FLAGS) -c $< -o $@
 
 %.o : %.cpp
 	mkdir -p $(dir $@)
-	$(CXX) $(pcem_CXXFLAGS) $(pcem_DEFS) -c $< -o $@
+	$(CXX) $(pcem_CXXFLAGS) $(pcem_DEFS) $(DEPS_FLAGS) -c $< -o $@
 
 .PHONY: clean
 clean:
@@ -122,3 +125,5 @@ endif
 	cp -R "$(srcdir)/nvr" "$(prefix)"
 	cp -R "$(srcdir)/configs" "$(prefix)"
 endif
+
+-include $(DEPS)
