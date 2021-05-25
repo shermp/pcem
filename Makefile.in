@@ -107,7 +107,7 @@ $(RC_RES): $(RC_SRC)
 
 .PHONY: clean
 clean:
-	rm -f $(PCEM_BIN) $(OBJ) $(XRC_RES)
+	rm -f $(PCEM_BIN) $(OBJ) $(XRC_RES) $(DEPS)
 
 .PHONY: install
 install:
