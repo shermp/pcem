@@ -6,6 +6,8 @@ CXX := @CXX@
 WINDRES := @WINDRES@
 
 prefix := @prefix@
+exec_prefix := @exec_prefix@
+bindir := @bindir@
 
 BIN := @PACKAGE_NAME@
 BUILD_OS := @BUILD_OS@
@@ -19,12 +21,15 @@ pcem_CFLAGS := $(subst -fpermissive,,@CFLAGS@)
 pcem_CXXFLAGS := @CXXFLAGS@
 pcem_DEFS := @DEFS@
 
+INSTALL_DIR := $(DESTDIR)$(prefix)
 ifeq ($(BUILD_OS),win)
 	PCEM_BIN := $(addsuffix .exe,$(BIN))
 	# During install on Windows, require ntldd
 	NTLDD := $(shell command -v ntldd 2> /dev/null)
+	BIN_DIR := $(INSTALL_DIR)
 else
 	PCEM_BIN := $(BIN)
+	BIN_DIR := $(bindir)
 endif
 
 include $(srcdir)/src/sources.mk
@@ -115,15 +120,20 @@ ifeq ($(BUILD_OS),win)
 ifndef NTLDD
 $(error ntldd required when installing on Windows)
 endif
-	mkdir -p "$(prefix)"
-	cp $(PCEM_BIN) "$(prefix)"
+	mkdir -p "$(BIN_DIR)"
+	cp $(PCEM_BIN) "$(BIN_DIR)"
 	# Find and copy all required dll files
 	for library in $$($(NTLDD) -R "$(PCEM_BIN)" | sed -e 's/^[[:blank:]]*//g' | cut -d ' ' -f 3 | grep -i 'mingw' | sed -e 's|\\|/|g'); do \
-		cp "$$library" "$(prefix)"; \
+		cp "$$library" "$(BIN_DIR)"; \
 	done
-	cp -R "$(srcdir)/roms" "$(prefix)" 
-	cp -R "$(srcdir)/nvr" "$(prefix)"
-	cp -R "$(srcdir)/configs" "$(prefix)"
+	cp -R "$(srcdir)/roms" "$(BIN_DIR)" 
+	cp -R "$(srcdir)/nvr" "$(BIN_DIR)"
+	cp -R "$(srcdir)/configs" "$(BIN_DIR)"
+
+else ifeq ($(BUILD_OS),linux)
+	mkdir -p $(BIN_DIR)
+	cp $(PCEM_BIN) $(BIN_DIR)
+endif
 endif
 
 -include $(DEPS)
