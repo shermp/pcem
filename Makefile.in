@@ -134,6 +134,16 @@ else ifeq ($(BUILD_OS),linux)
 	mkdir -p $(BIN_DIR)
 	cp $(PCEM_BIN) $(BIN_DIR)
 endif
+
+.PHONY: uninstall
+uninstall:
+ifeq ($(BUILD_OS),win)
+	# Keep the configs and roms directories in case the user wants to keep their contents
+	rm "$(BIN_DIR)/$(PCEM_BIN)"
+	rm "$(BIN_DIR)/*.dll"
+	rm -rf "$(BIN_DIR)/nvr"
+else ifeq ($(BUILD_OS),linux)
+	rm rm "$(BIN_DIR)/$(PCEM_BIN)"
 endif
 
 -include $(DEPS)
